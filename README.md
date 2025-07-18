@@ -1,93 +1,119 @@
 # JobImport-Hub
----
+-----
 
 ## 🚀 Overview
 
-JobImport-Hub is a robust, production-ready solution for efficient job-feed aggregation. It automatically fetches multiple XML feeds, deduplicates and upserts jobs into MongoDB, tracks import history, and exposes a real-time admin UI.  
-Built with **Next.js**, **Express**, **MongoDB**, **Redis**, **BullMQ**, and orchestrated by **Docker Compose**, it provides a scalable foundation for any job board or aggregation platform.
+JobImport-Hub is a robust, production-ready solution for efficient job-feed aggregation. It automatically fetches multiple XML feeds, deduplicates and upserts jobs into MongoDB, tracks import history, and exposes a real-time admin UI. Built with **Next.js**, **Express**, **MongoDB**, **Redis**, **BullMQ**, and orchestrated by **Docker Compose**, it provides a scalable and reliable foundation for any job board or data aggregation platform.
 
----
+-----
 
 ## ✨ Key Features
 
-* **Automated & on-demand imports:** Schedule hourly imports or trigger them manually for multiple XML feeds.  
-* **Intelligent data processing:** Converts XML to JSON, deduplicates, and upserts the data into MongoDB.  
-* **Scalable queueing:** Uses **Redis** + **BullMQ** for high-throughput job processing.  
-* **Comprehensive logging:** Records totals, new, updated, and failed jobs for every run.  
-* **Real-time Admin UI (Next.js):**  
-  * **Live dashboard:** Progress updates via Server-Sent Events (SSE).  
-  * **Import history:** Detailed statistics for all runs.  
-* **Containerized deployment:** One-command local, staging, and production stacks via **Docker Compose**.  
-* **Flexible configuration:** All settings are environment-variable driven.  
-* **Rigorous testing:** Jest + ESM tests for XML parsing and data-normalization logic.
+  * **Automated & On-Demand Imports:** Schedule hourly imports or trigger them manually for any number of XML feeds.
+  * **Intelligent Data Processing:** Efficiently converts XML to JSON, deduplicates jobs based on a unique ID, and upserts the data into MongoDB.
+  * **Scalable Queueing:** Uses **Redis** + **BullMQ** for high-throughput, reliable background job processing.
+  * **Comprehensive Logging:** Records totals, new, updated, and failed jobs for every import run, providing full auditability.
+  * **Real-time Admin UI (Next.js):**
+      * **Live Dashboard:** View import progress in real-time via Server-Sent Events (SSE).
+      * **Import History:** Browse detailed statistics and metadata for all previous runs.
+  * **Containerized Deployment:** One-command local, staging, and production stacks via **Docker Compose**.
+  * **Flexible Configuration:** All settings are driven by environment variables for easy management across different environments.
+  * **Rigorous Testing:** Includes Jest + ESM tests for core XML parsing and data-normalization logic.
 
----
+-----
 
 ## 🏗️ System Architecture
 
-```
+*The diagram below illustrates the flow of data and interaction between the system's components.*
+
+```mermaid
 graph TD
-    subgraph Client [Next.js Admin UI]
-        UI[Dashboard & History Table]
-        SSE[Live Updates (SSE)]
+    subgraph User Interaction
+        Admin([👩‍💻 Admin User])
     end
 
-    subgraph Server
-        CRON[Cron Scheduler (node-cron)]
-        API[Express API]
-        QUEUE[Redis Queue (BullMQ)]
-        WORKER[Import Worker(s)]
-        MONGO[MongoDB]
-        LOGS[ImportLog Collection]
-        JOBS[Job Collection]
+    subgraph "Frontend (Client)"
+        style "Frontend (Client)" fill:#D6EAF8,stroke:#333,stroke-width:2px
+        UI_Dashboard["Live Dashboard</br>(localhost:3000)"]
+        UI_History["History Page</br>(localhost:3000)"]
     end
 
-    CRON -- Hourly / Manual Trigger --> QUEUE
-    API -- /api/import --> QUEUE
-    QUEUE -- Job Payload --> WORKER
-    WORKER -- Upsert Jobs --> JOBS
-    WORKER -- Write ImportLog --> LOGS
+    subgraph "Backend (Server)"
+        style "Backend (Server)" fill:#D5F5E3,stroke:#333,stroke-width:2px
+        API["Express API Server</br>(/api/import, /api/history, /api/progress)"]
+        Cron["Node-Cron Scheduler</br>(Hourly Trigger)"]
+        Queue["BullMQ Queue</br>(import-queue)"]
+        Worker["Background Worker</br>(Processes Feeds)"]
+    end
+
+    subgraph "Databases & Services"
+        style "Databases & Services" fill:#FCF3CF,stroke:#333,stroke-width:2px
+        MongoDB["MongoDB</br>(Stores Jobs & Logs)"]
+        Redis["Redis</br>(Queue Broker)"]
+        ExternalFeeds([🌐 External XML Feeds])
+    end
+
+    %% --- Connections ---
+    Admin -- "1. Triggers Manual Import" --> UI_Dashboard
+    Admin -- "Views Past Imports" --> UI_History
+
+    UI_Dashboard -- "2. POST /api/import" --> API
+    UI_Dashboard -- "6. SSE Connection</br>/api/progress" --> API
+
+    API -- "3. Enqueues Jobs" --> Queue
+    Cron -- "Alt. Trigger (Hourly)" --> Queue
+
+    Queue -- "Linked via" --> Redis
+    Queue -- "4. Sends Job Payload" --> Worker
+
+    Worker -- "5. Fetches XML" --> ExternalFeeds
+    Worker -- "5a. Upserts/Updates Jobs" --> MongoDB
+    Worker -- "5b. Writes Import Log" --> MongoDB
+    Worker -- "Reports Live Progress" --> API
+
+    UI_History -- "Fetches Data</br>GET /api/history" --> API
+    API -- "Reads Logs" --> MongoDB
+
 ```
 
 ### How It Works
 
-1. **Initiation:** A cron job or a POST to `/api/import` enqueues import tasks.  
-2. **Queueing:** Jobs are placed on a Redis queue via BullMQ.  
-3. **Processing:** Workers fetch XML, convert to JSON, deduplicate, and upsert into MongoDB while writing ImportLog stats.  
-4. **Admin UI:**  
-   * Fetches historical data from `/api/history`.  
-   * Subscribes to `/api/progress` for live updates.  
-5. **Storage:** All job data and import logs reside in MongoDB.
+1.  **Initiation:** An import process is started either automatically by a **Cron Scheduler** (hourly) or manually when an admin clicks the "Trigger Import" button on the UI, which sends a `POST` request to the `/api/import` endpoint.
+2.  **Queueing:** For each XML feed, the API server adds a job to the **BullMQ Queue**, which is backed by **Redis**. This ensures jobs are processed reliably and don't get lost.
+3.  **Processing:** A background **Worker** listens to the queue. When it receives a job, it fetches the XML data, parses it, and iterates through each job listing. It then performs an `upsert` operation in **MongoDB**, either creating a new job document or updating an existing one.
+4.  **Logging:** The worker tracks the number of new and updated jobs and writes a detailed log to an `ImportLog` collection in MongoDB upon completion or failure.
+5.  **Admin UI:**
+      * The dashboard establishes a Server-Sent Events (SSE) connection to `/api/progress` to receive and display live updates from the worker.
+      * The history page fetches all past import logs from the `/api/history` endpoint.
+6.  **Storage:** All job data and import logs are stored permanently in **MongoDB**.
 
----
+-----
 
 ## 📦 Project Structure
 
 ```
 root/
- ├─ docker-compose.yml
- ├─ server/
- │  ├─ Dockerfile
- │  ├─ package.json
- │  ├─ src/
- │  │  ├─ index.js
- │  │  ├─ config/
- │  │  ├─ models/
- │  │  ├─ services/
- │  │  ├─ workers/
- │  │  └─ routes/
- │  ├─ tests/
- │  └─ scripts/
- ├─ client/
- │  ├─ Dockerfile
- │  ├─ package.json
- │  ├─ next.config.js
- │  ├─ pages/
- │  └─ components/
- ├─ docs/
- └─ README.md
+├─ docker-compose.yml
+├─ server/
+│  ├─ Dockerfile
+│  ├─ package.json
+│  ├─ src/
+│  │  ├─ index.js
+│  │  ├─ config/
+│  │  ├─ models/
+│  │  ├─ services/
+│  │  ├─ workers/
+│  │  └─ routes/
+│  └─ tests/
+└─ client/
+   ├─ Dockerfile
+   ├─ package.json
+   ├─ next.config.js
+   ├─ pages/
+   └─ components/
 ```
 
+-----
 
 ## 🛠️ Setup & Usage
 
@@ -136,7 +162,7 @@ You can trigger an import operation for all configured feeds via a simple API ca
   * **POST** `http://localhost:4000/api/import`: Initiates an import for all feeds defined in the `IMPORT_FEEDS` environment variable.
   * **GET** `http://localhost:4000/api/history`: Retrieves paginated import logs.
   * **GET** `http://localhost:4000/api/progress`: Establishes an SSE connection for live import progress updates.
-  * **GET** `http://localhost:4000/api/jobs`: Fetches and parses jobs from all configured feeds (useful for testing/demo purposes without upserting).
+  * **GET** `http://localhost:4000/api/jobs`: Fetches all jobs from the database.
 
 #### Example using `curl`:
 
@@ -203,15 +229,6 @@ JobImport-Hub is ideal for scenarios requiring robust job feed processing, such 
   * **Auditing & Tracking:** Maintain a detailed history of all import activities, including successes and failures, for compliance and analysis.
   * **Real-time Monitoring:** Keep a pulse on your import pipeline with live status updates.
   * **Scalable Data Ingestion:** Process large volumes of job data reliably using a queue-based system.
-
------
-
-## 📚 Further Documentation
-
-For more in-depth information, explore our dedicated documentation:
-
-  * **`docs/architecture.md`**: Delve deeper into scaling strategies, sharding, and advanced worker configurations.
-  * **`docs/deployment.md`**: Find guides for deploying JobImport-Hub to platforms like Render, Vercel, or Kubernetes.
 
 -----
 
