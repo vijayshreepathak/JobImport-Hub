@@ -1,4 +1,5 @@
 # JobImport-Hub
+
 -----
 
 ## 🚀 Overview
@@ -28,30 +29,32 @@ JobImport-Hub is a robust, production-ready solution for efficient job-feed aggr
 
 ```mermaid
 graph TD
-    subgraph User Interaction
+    subgraph user_interaction ["User Interaction"]
         Admin([👩‍💻 Admin User])
     end
 
-    subgraph "Frontend (Client)"
-        style "Frontend (Client)" fill:#D6EAF8,stroke:#333,stroke-width:2px
+    subgraph client ["Frontend (Client)"]
         UI_Dashboard["Live Dashboard</br>(localhost:3000)"]
         UI_History["History Page</br>(localhost:3000)"]
     end
 
-    subgraph "Backend (Server)"
-        style "Backend (Server)" fill:#D5F5E3,stroke:#333,stroke-width:2px
+    subgraph server ["Backend (Server)"]
         API["Express API Server</br>(/api/import, /api/history, /api/progress)"]
         Cron["Node-Cron Scheduler</br>(Hourly Trigger)"]
         Queue["BullMQ Queue</br>(import-queue)"]
         Worker["Background Worker</br>(Processes Feeds)"]
     end
 
-    subgraph "Databases & Services"
-        style "Databases & Services" fill:#FCF3CF,stroke:#333,stroke-width:2px
+    subgraph db ["Databases & Services"]
         MongoDB["MongoDB</br>(Stores Jobs & Logs)"]
         Redis["Redis</br>(Queue Broker)"]
         ExternalFeeds([🌐 External XML Feeds])
     end
+
+    %% --- Styling ---
+    style client fill:#D6EAF8,stroke:#333,stroke-width:2px
+    style server fill:#D5F5E3,stroke:#333,stroke-width:2px
+    style db fill:#FCF3CF,stroke:#333,stroke-width:2px
 
     %% --- Connections ---
     Admin -- "1. Triggers Manual Import" --> UI_Dashboard
@@ -73,7 +76,6 @@ graph TD
 
     UI_History -- "Fetches Data</br>GET /api/history" --> API
     API -- "Reads Logs" --> MongoDB
-
 ```
 
 ### How It Works
