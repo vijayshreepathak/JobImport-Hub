@@ -28,28 +28,29 @@ JobImport-Hub is a robust, production-ready solution designed for efficient job 
 JobImport-Hub employs a microservices-inspired architecture, ensuring modularity, scalability, and resilience.
 
 ```mermaid
+
 graph TD;
-  subgraph Client [Next.js Admin UI]
-    UI[Dashboard & History Table]
-    SSE[Live Updates (SSE)]
-  end
-  subgraph Server Backend
-    CRON[Cron Scheduler (node-cron)]
-    API[Express API]
-    QUEUE[Redis Queue (BullMQ)]
-    WORKER[Import Worker(s)]
-    MONGO[(MongoDB Database)]
-    LOGS[ImportLog Collection]
-    JOBS[Job Collection]
-  end
-  CRON -- "Hourly/Manual Trigger" --> QUEUE
-  API -- "/api/import Request" --> QUEUE
-  QUEUE -- "Job Payload" --> WORKER
-  WORKER -- "Upsert Jobs, Log History" --> MONGO
-  WORKER -- "Write ImportLog" --> LOGS
-  WORKER -- "Write Job Data" --> JOBS
-  UI -- "Fetch /api/history" --> API
-  UI -- "SSE /api/progress" --> API
+  subgraph Client [Next.js Admin UI]
+    UI[Dashboard & History Table]
+    SSE["Live Updates (SSE)"]  // Changed here: Enclosed in double quotes
+  end
+  subgraph Server Backend
+    CRON[Cron Scheduler (node-cron)]
+    API[Express API]
+    QUEUE[Redis Queue (BullMQ)]
+    WORKER[Import Worker(s)]
+    MONGO[(MongoDB Database)]
+    LOGS[ImportLog Collection]
+    JOBS[Job Collection]
+  end
+  CRON -- "Hourly/Manual Trigger" --> QUEUE
+  API -- "/api/import Request" --> QUEUE
+  QUEUE -- "Job Payload" --> WORKER
+  WORKER -- "Upsert Jobs, Log History" --> MONGO
+  WORKER -- "Write ImportLog" --> LOGS
+  WORKER -- "Write Job Data" --> JOBS
+  UI -- "Fetch /api/history" --> API
+  UI -- "SSE /api/progress" --> API
 ```
 
 ### How It Works:
