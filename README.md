@@ -1,107 +1,93 @@
 # JobImport-Hub
-
------
+---
 
 ## 🚀 Overview
 
-JobImport-Hub is a robust, production-ready solution designed for efficient job feed aggregation. It automatically fetches multiple XML job feeds, intelligently deduplicates and upserts jobs into MongoDB, meticulously tracks import history, and provides a sleek, real-time administrative user interface. Built with a modern stack including **Next.js**, **Express**, **MongoDB**, **Redis**, and **BullMQ**, and orchestrated with **Docker Compose**, this system offers a scalable and reliable foundation for any job board or aggregation platform.
+JobImport-Hub is a robust, production-ready solution for efficient job-feed aggregation. It automatically fetches multiple XML feeds, deduplicates and upserts jobs into MongoDB, tracks import history, and exposes a real-time admin UI.  
+Built with **Next.js**, **Express**, **MongoDB**, **Redis**, **BullMQ**, and orchestrated by **Docker Compose**, it provides a scalable foundation for any job board or aggregation platform.
 
------
+---
 
 ## ✨ Key Features
 
-  * **Automated & On-Demand Imports:** Schedule hourly imports or trigger them manually for multiple XML job feeds.
-  * **Intelligent Data Processing:** Converts XML to JSON, then deduplicates and efficiently upserts job data into MongoDB.
-  * **Scalable Queueing:** Leverages **Redis** and **BullMQ** for robust job queuing and concurrent processing, ensuring high throughput.
-  * **Comprehensive Logging:** Tracks every import run, detailing total jobs processed, new additions, updates, and failures.
-  * **Real-time Admin UI (Next.js):**
-      * **Live Dashboard:** Monitor import progress in real-time via Server-Sent Events (SSE).
-      * **Import History:** View a detailed history of all import runs, complete with statistics.
-  * **Containerized Deployment:** Seamless local, development, and production deployments powered by **Docker Compose**.
-  * **Flexible Configuration:** Fully driven by environment variables for easy customization.
-  * **Rigorous Testing:** Automated tests (Jest + ESM) ensure reliable XML parsing and data normalization.
+* **Automated & on-demand imports:** Schedule hourly imports or trigger them manually for multiple XML feeds.  
+* **Intelligent data processing:** Converts XML to JSON, deduplicates, and upserts the data into MongoDB.  
+* **Scalable queueing:** Uses **Redis** + **BullMQ** for high-throughput job processing.  
+* **Comprehensive logging:** Records totals, new, updated, and failed jobs for every run.  
+* **Real-time Admin UI (Next.js):**  
+  * **Live dashboard:** Progress updates via Server-Sent Events (SSE).  
+  * **Import history:** Detailed statistics for all runs.  
+* **Containerized deployment:** One-command local, staging, and production stacks via **Docker Compose**.  
+* **Flexible configuration:** All settings are environment-variable driven.  
+* **Rigorous testing:** Jest + ESM tests for XML parsing and data-normalization logic.
 
------
+---
 
 ## 🏗️ System Architecture
 
-JobImport-Hub employs a microservices-inspired architecture, ensuring modularity, scalability, and resilience.
-
 ```
-
-graph TD;
-    %% Client Side
+graph TD
     subgraph Client [Next.js Admin UI]
         UI[Dashboard & History Table]
-        SSE["Live Updates (SSE)"]
+        SSE[Live Updates (SSE)]
     end
 
-    %% Server Side
-    subgraph Server Backend
+    subgraph Server
         CRON[Cron Scheduler (node-cron)]
         API[Express API]
         QUEUE[Redis Queue (BullMQ)]
         WORKER[Import Worker(s)]
-        MONGO[MongoDB Database]
-        LOGS[Importlog Collection]
+        MONGO[MongoDB]
+        LOGS[ImportLog Collection]
         JOBS[Job Collection]
     end
 
-    %% Connections
-    CRON -- "Hourly/Manual Trigger" --> QUEUE
-    API -- "/api/import Request" --> QUEUE
-    QUEUE -- "Job Payload" --> WORKER
-    WORKER -- "Upsert Jobs, Log History" --> MONGO
-    WORKER -- "Write Importlog" --> LOGS
+    CRON -- Hourly / Manual Trigger --> QUEUE
+    API -- /api/import --> QUEUE
+    QUEUE -- Job Payload --> WORKER
+    WORKER -- Upsert Jobs --> JOBS
+    WORKER -- Write ImportLog --> LOGS
 ```
 
-### How It Works:
+### How It Works
 
-1.  **Initiation:** Imports are triggered either automatically by a **Cron Scheduler** (using `node-cron`) or manually via an API endpoint (`/api/import`) exposed by the **Express API**.
-2.  **Queueing:** Triggered imports are pushed as job payloads onto a **Redis Queue** managed by **BullMQ**. This decouples the import initiation from the processing, enabling asynchronous and scalable operations.
-3.  **Processing:** Dedicated **Import Workers** consume jobs from the Redis Queue. Each worker handles:
-      * Fetching and parsing XML job feeds.
-      * Converting XML data to a standardized JSON format.
-      * Deduplicating jobs to prevent duplicates.
-      * Upserting (inserting new or updating existing) job records into the **MongoDB Job Collection**.
-      * Recording detailed statistics of each import run (total, new, updated, failed jobs) into the **MongoDB ImportLog Collection**.
-4.  **Admin UI Interaction:**
-      * The **Next.js Admin UI** fetches historical import data from the Express API (`/api/history`).
-      * For real-time progress updates during active imports, the UI subscribes to **Server-Sent Events (SSE)** from the Express API (`/api/progress`).
-5.  **Data Storage:** **MongoDB** serves as the primary data store for both job listings and import history logs.
+1. **Initiation:** A cron job or a POST to `/api/import` enqueues import tasks.  
+2. **Queueing:** Jobs are placed on a Redis queue via BullMQ.  
+3. **Processing:** Workers fetch XML, convert to JSON, deduplicate, and upsert into MongoDB while writing ImportLog stats.  
+4. **Admin UI:**  
+   * Fetches historical data from `/api/history`.  
+   * Subscribes to `/api/progress` for live updates.  
+5. **Storage:** All job data and import logs reside in MongoDB.
 
------
+---
 
 ## 📦 Project Structure
 
 ```
 root/
- ├─ docker-compose.yml             # Defines services for Docker Compose
- ├─ server/                        # Backend (Node.js/Express)
- │  ├─ Dockerfile                  # Dockerfile for the backend service
- │  ├─ package.json                # Backend dependencies and scripts
- │  ├─ src/                        # Backend source code
- │  │  ├─ index.js                 # Main server entry point
- │  │  ├─ config/                  # Database & Redis connection configurations
- │  │  ├─ models/                  # Mongoose models (Job, ImportLog)
- │  │  ├─ services/                # Core business logic (job fetching, queue, cron)
- │  │  ├─ workers/                 # BullMQ worker for processing import jobs
- │  │  └─ routes/                  # API routes
- │  ├─ tests/                      # Unit tests for backend logic
- │  └─ scripts/                    # Utility scripts (e.g., manual import)
- ├─ client/                        # Frontend (Next.js)
- │  ├─ Dockerfile                  # Dockerfile for the frontend service
- │  ├─ package.json                # Frontend dependencies and scripts
- │  ├─ next.config.js              # Next.js configuration
- │  ├─ pages/                      # Next.js pages (dashboard, history)
- │  └─ components/                 # Reusable React components
- ├─ docs/                          # Additional documentation
- │  ├─ architecture.md             # In-depth architecture details (e.g., scaling)
- │  └─ deployment.md               # Deployment guides
- └─ README.md                      # This README file
+ ├─ docker-compose.yml
+ ├─ server/
+ │  ├─ Dockerfile
+ │  ├─ package.json
+ │  ├─ src/
+ │  │  ├─ index.js
+ │  │  ├─ config/
+ │  │  ├─ models/
+ │  │  ├─ services/
+ │  │  ├─ workers/
+ │  │  └─ routes/
+ │  ├─ tests/
+ │  └─ scripts/
+ ├─ client/
+ │  ├─ Dockerfile
+ │  ├─ package.json
+ │  ├─ next.config.js
+ │  ├─ pages/
+ │  └─ components/
+ ├─ docs/
+ └─ README.md
 ```
 
------
 
 ## 🛠️ Setup & Usage
 
