@@ -1,0 +1,27 @@
+version: '3'
+services:
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  server:
+    build: ./server
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongo
+      - redis
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/job_importer
+      - REDIS_HOST=redis
+      - IMPORT_FEEDS=https://jobicy.com/?feed=job_feed,https://jobicy.com/?feed=job_feed&job_categories=smm
+  client:
+    build: ./client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
